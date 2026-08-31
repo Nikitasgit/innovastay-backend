@@ -8,6 +8,7 @@ import DeleteImagesUseCase from "@src/application/usecases/images/DeleteImages.u
 import CreateNotificationUseCase from "@src/application/usecases/notifications/CreateNotification.usecase";
 import CascadeDeleteUseCase from "@src/application/usecases/shared/CascadeDelete.usecase";
 import AwsImageStorageAdapter from "@src/infrastructure/adapters/AwsImageStorage.adapter";
+import RedisCacheAdapter from "@src/infrastructure/adapters/RedisCache.adapter";
 import JwtTokenIssuerAdapter from "@src/infrastructure/adapters/JwtTokenIssuer.adapter";
 import MongooseUnreadConversationCounter from "@src/infrastructure/adapters/MongooseUnreadConversationCounter.adapter";
 import NotificationEmailSenderAdapter from "@src/infrastructure/adapters/NotificationEmailSender.adapter";
@@ -61,10 +62,12 @@ export const registerInfrastructureModule = (
     unreadConversationCounter: asClass(
       MongooseUnreadConversationCounter
     ).singleton(),
-    notificationEmailSender: asClass(NotificationEmailSenderAdapter).singleton(),
+    notificationEmailSender: asClass(
+      NotificationEmailSenderAdapter
+    ).singleton(),
     jwtTokenIssuer: asClass(JwtTokenIssuerAdapter).singleton(),
 
-    // Avoid CLASSIC resolving optional `awsService` constructor param
+    cache: asFunction(() => new RedisCacheAdapter()).singleton(),
     imageStorage: asFunction(() => new AwsImageStorageAdapter()).singleton(),
 
     notificationCreator: asClass(CreateNotificationUseCase).singleton(),

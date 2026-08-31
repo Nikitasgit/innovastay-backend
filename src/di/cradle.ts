@@ -118,6 +118,7 @@ import type GetUsersUseCase from "@src/application/usecases/users/GetUsers.useca
 import type UpdateUserUseCase from "@src/application/usecases/users/UpdateUser.usecase";
 import type { IAnnouncementRepository } from "@src/domain/interfaces/IAnnouncementRepository";
 import type { IAuthEmailSender } from "@src/domain/interfaces/IAuthEmailSender";
+import type { ICache } from "@src/domain/interfaces/ICache";
 import type { ICascadeDeleter } from "@src/domain/interfaces/ICascadeDeleter";
 import type { ICategoryRepository } from "@src/domain/interfaces/ICategoryRepository";
 import type { ICommentReferenceChecker } from "@src/domain/interfaces/ICommentReferenceChecker";
@@ -182,6 +183,7 @@ export interface Cradle {
   announcementRepository: IAnnouncementRepository;
 
   // Shared adapters / ports
+  cache: ICache;
   userPlaceLinker: IUserPlaceLinker;
   realtimePublisher: IMessageRealtimePublisher;
   unreadConversationCounter: IUnreadConversationCounter;

@@ -17,7 +17,7 @@ export async function connectPrisma(): Promise<void> {
     await prisma.$connect();
     logger.info("PostgreSQL connected (Prisma)");
   } catch (err) {
-    logger.error("PostgreSQL connection error:", (err as Error).message);
+    logger.error(`PostgreSQL connection error: ${(err as Error).message}`);
     process.exit(1);
   }
 }
