@@ -5,6 +5,12 @@ import UserCategory from "../src/infrastructure/persistence/schemas/UserCategory
 import PlaceCategory from "../src/infrastructure/persistence/schemas/PlaceCategory.schema";
 import ProductCategory from "../src/infrastructure/persistence/schemas/ProductCategory.schema";
 import EventCategory from "../src/infrastructure/persistence/schemas/EventCategory.schema";
+import { CATEGORIES_CACHE_KEY } from "../src/application/cache/cacheKeys";
+import RedisCacheAdapter from "../src/infrastructure/adapters/RedisCache.adapter";
+import {
+  connectRedis,
+  disconnectRedis,
+} from "../src/infrastructure/persistence/redis";
 
 const categoryTypes = [
   { name: "art" },
@@ -264,10 +270,16 @@ async function seed() {
     console.log(`eventcategories verifiees : ${eventCategories.length}`);
 
     console.log("Seed des categories termine.");
+
+    await connectRedis();
+    const cache = new RedisCacheAdapter();
+    await cache.del(CATEGORIES_CACHE_KEY);
+    console.log("Cache categories invalide.");
   } catch (error) {
     console.error("Seed failed:", error);
     process.exit(1);
   } finally {
+    await disconnectRedis();
     await mongoose.disconnect();
     console.log("MongoDB disconnected");
   }

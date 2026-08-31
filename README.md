@@ -397,6 +397,7 @@ PORT=3000
 NODE_ENV=development|production
 MONGODB_URI=mongodb://...
 DATABASE_URL=postgresql://leafymap:leafymap@localhost:5432/leafymap?schema=public
+REDIS_URL=redis://localhost:6379
 JWT_SECRET=your_secret_key
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
@@ -427,6 +428,20 @@ npx prisma migrate dev
 Le compose démarre Postgres 16 sur le port `5432` (`leafymap` / `leafymap` / db `leafymap`).
 Voir aussi `env.example`.
 
+### Redis (cache)
+
+- **Client** : `redis` (node-redis), via `src/infrastructure/persistence/redis.ts`
+- **Port** : `ICache` (`src/domain/interfaces/ICache.ts`)
+- **Usage actuel** : `GET /api/categories` (clé `categories:all`, TTL 24h), invalidé par `npm run seed:categories`
+- **Fail-open** : si `REDIS_URL` est absent ou Redis injoignable, l'API retombe sur Mongo
+- **Docker local** : service `redis` (port `6379`) dans le compose à la racine du repo
+
+```env
+REDIS_URL=redis://localhost:6379
+```
+
+En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant que la variable n'est pas définie, le comportement reste celui d'avant (pas de cache).
+
 ### AWS S3
 
 - **SDK** : @aws-sdk/client-s3 v3
@@ -438,6 +453,7 @@ Voir aussi `env.example`.
 - **Express** : Framework web
 - **Mongoose** : ODM MongoDB
 - **Prisma** : ORM PostgreSQL (annonces plateforme)
+- **Redis** : cache (catégories ; fail-open)
 - **Zod** : Validation de schémas
 - **JWT** : Authentification
 - **Bcrypt** : Hashage des mots de passe
