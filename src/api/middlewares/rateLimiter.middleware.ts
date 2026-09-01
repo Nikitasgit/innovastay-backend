@@ -42,6 +42,23 @@ class RateLimiterMiddleware {
   }
 
   /**
+   * Caps Mapbox geocoding proxy usage (60 requests per minute per IP).
+   */
+  geocode(): RateLimitRequestHandler {
+    return rateLimit({
+      windowMs: 60 * 1000,
+      max: 60,
+      message: {
+        success: false,
+        message: "Trop de requêtes. Veuillez réessayer plus tard.",
+        code: ERROR_CODES.RATE_LIMIT_EXCEEDED,
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+  }
+
+  /**
    * Strict rate limiter for sensitive operations (delete, etc.)
    * @returns Rate limit middleware (1 hour, max 5 requests)
    */

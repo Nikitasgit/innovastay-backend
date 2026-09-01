@@ -9,6 +9,7 @@ import type EventInvitationsController from "@src/api/controllers/EventInvitatio
 import type EventsController from "@src/api/controllers/EventsController";
 import type FavoritesController from "@src/api/controllers/FavoritesController";
 import type FollowsController from "@src/api/controllers/FollowsController";
+import type GeocodingController from "@src/api/controllers/GeocodingController";
 import type ImagesController from "@src/api/controllers/ImagesController";
 import type MessagesController from "@src/api/controllers/MessagesController";
 import type NotificationsController from "@src/api/controllers/NotificationsController";
@@ -36,6 +37,7 @@ export interface RouteDependencies {
   eventsController: EventsController;
   favoritesController: FavoritesController;
   followsController: FollowsController;
+  geocodingController: GeocodingController;
   imagesController: ImagesController;
   messagesController: MessagesController;
   notificationsController: NotificationsController;

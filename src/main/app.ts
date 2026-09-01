@@ -16,6 +16,7 @@ import createMessageRoutes from "@src/api/routes/message.routes";
 import createNotificationRoutes from "@src/api/routes/notification.routes";
 import createFollowRoutes from "@src/api/routes/follow.routes";
 import createFavoriteRoutes from "@src/api/routes/favorite.routes";
+import createGeocodeRoutes from "@src/api/routes/geocode.routes";
 import createProductRoutes from "@src/api/routes/product.routes";
 import createAdminRoutes from "@src/api/routes/admin.routes";
 import createAnnouncementRoutes from "@src/api/routes/announcement.routes";
@@ -98,6 +99,13 @@ app.use(
   "/api/categories",
   createCategoryRoutes({
     categoriesController: cradle.categoriesController,
+  })
+);
+app.use(
+  "/api/geocode",
+  createGeocodeRoutes({
+    geocodingController: cradle.geocodingController,
+    rateLimiterMiddleware: cradle.rateLimiterMiddleware,
   })
 );
 app.use(

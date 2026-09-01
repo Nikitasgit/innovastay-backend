@@ -398,6 +398,7 @@ NODE_ENV=development|production
 MONGODB_URI=mongodb://...
 DATABASE_URL=postgresql://leafymap:leafymap@localhost:5432/leafymap?schema=public
 REDIS_URL=redis://localhost:6379
+MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here
 JWT_SECRET=your_secret_key
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
@@ -432,7 +433,10 @@ Voir aussi `env.example`.
 
 - **Client** : `redis` (node-redis), via `src/infrastructure/persistence/redis.ts`
 - **Port** : `ICache` (`src/domain/interfaces/ICache.ts`)
-- **Usage actuel** : `GET /api/categories` (clé `categories:all`, TTL 24h), invalidé par `npm run seed:categories`
+- **Usage actuel** :
+  - `GET /api/categories` (clé `categories:all`, TTL 24h), invalidé par `npm run seed:categories`
+  - `GET /api/places/in-view` et `GET /api/events/in-view` (bbox quantifiée, TTL 30s / 20s ; pas de cache sur `ids`)
+  - `GET /api/geocode/suggest` et `GET /api/geocode/reverse` (TTL 1h)
 - **Fail-open** : si `REDIS_URL` est absent ou Redis injoignable, l'API retombe sur Mongo
 - **Docker local** : service `redis` (port `6379`) dans le compose à la racine du repo
 
@@ -440,7 +444,20 @@ Voir aussi `env.example`.
 REDIS_URL=redis://localhost:6379
 ```
 
-En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant que la variable n'est pas définie, le comportement reste celui d'avant (pas de cache).
+En production, pointer `REDIS_URL` vers l'URL **TCP** du provider (pas l'API REST Upstash). Upstash exige TLS : `rediss://default:PASSWORD@HOST:6379` (l'équivalent de `redis-cli --tls`). Tant que la variable n'est pas définie, le comportement reste celui d'avant (pas de cache).
+
+### Mapbox (géocodage)
+
+Le frontend utilise encore `NEXT_PUBLIC_MAPBOX_TOKEN` pour les **tuiles**. Le géocodage (autocomplete, reverse) passe par l'API :
+
+- `GET /api/geocode/suggest?q=`
+- `GET /api/geocode/reverse?lng=&lat=`
+
+```env
+MAPBOX_ACCESS_TOKEN=pk.your_mapbox_token
+```
+
+Si le token est absent ou Mapbox injoignable, l'API renvoie une liste vide / `null` (fail-open). À définir aussi sur Render, côté web service.
 
 ### AWS S3
 
@@ -453,7 +470,7 @@ En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant q
 - **Express** : Framework web
 - **Mongoose** : ODM MongoDB
 - **Prisma** : ORM PostgreSQL (annonces plateforme)
-- **Redis** : cache (catégories ; fail-open)
+- **Redis** : cache (catégories, carte in-view, géocodage ; fail-open)
 - **Zod** : Validation de schémas
 - **JWT** : Authentification
 - **Bcrypt** : Hashage des mots de passe
