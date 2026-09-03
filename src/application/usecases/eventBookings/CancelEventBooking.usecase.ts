@@ -46,10 +46,10 @@ class CancelEventBookingUseCase {
       );
     }
 
-    if (event && event.lifecycleStatus !== "upcoming") {
+    if (event && !event.areBookingsOpen()) {
       throw new ForbiddenError(
         ERROR_CODES.EVENT_BOOKING_CANCEL_CLOSED,
-        "Cet évènement a déjà commencé ou est terminé, la réservation ne peut plus être annulée"
+        "Cet évènement est terminé, la réservation ne peut plus être annulée"
       );
     }
 

@@ -133,4 +133,91 @@ describe("CreateEventBookingUseCase", () => {
       code: ERROR_CODES.EVENT_BOOKING_NOT_ENOUGH_SEATS,
     });
   });
+
+  it("rejects booking when the event is not bookable", async () => {
+    const event = createBookableEvent({
+      ownerId: mockObjectId(),
+      isBookable: false,
+    });
+    eventRepository.findById.mockResolvedValue(event);
+
+    await expect(
+      useCase.execute({
+        eventId: event.id!.toString(),
+        userId: mockObjectId(),
+        seats: 1,
+      })
+    ).rejects.toMatchObject({
+      code: ERROR_CODES.EVENT_NOT_BOOKABLE,
+    });
+    expect(eventBookingRepository.save).not.toHaveBeenCalled();
+  });
+
+  it("creates a booking when the event is ongoing", async () => {
+    const ownerId = mockObjectId();
+    const userId = mockObjectId();
+    const event = createBookableEvent({
+      ownerId,
+      lifecycleStatus: "ongoing",
+    });
+    const bookingId = mockObjectId();
+
+    eventRepository.findById.mockResolvedValue(event);
+    eventBookingRepository.findConfirmedByEventAndUser.mockResolvedValue(null);
+    eventBookingRepository.sumConfirmedSeats.mockResolvedValue(0);
+    eventBookingRepository.save.mockResolvedValue(
+      EventBookingId.from(bookingId)
+    );
+
+    const result = await useCase.execute({
+      eventId: event.id!.toString(),
+      userId,
+      seats: 1,
+    });
+
+    expect(result).toEqual({ id: bookingId });
+    expect(eventBookingRepository.save).toHaveBeenCalled();
+  });
+
+  it("rejects booking when the event is completed", async () => {
+    const event = createBookableEvent({
+      ownerId: mockObjectId(),
+      lifecycleStatus: "completed",
+    });
+    eventRepository.findById.mockResolvedValue(event);
+
+    await expect(
+      useCase.execute({
+        eventId: event.id!.toString(),
+        userId: mockObjectId(),
+        seats: 1,
+      })
+    ).rejects.toMatchObject({
+      code: ERROR_CODES.EVENT_BOOKING_CLOSED,
+    });
+    expect(eventBookingRepository.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects a second confirmed booking for the same user and event", async () => {
+    const event = createBookableEvent({ ownerId: mockObjectId() });
+    eventRepository.findById.mockResolvedValue(event);
+    eventBookingRepository.findConfirmedByEventAndUser.mockResolvedValue({
+      id: mockObjectId(),
+      event: event.id!.toString(),
+      user: mockObjectId(),
+      seats: 1,
+      status: "confirmed",
+    });
+
+    await expect(
+      useCase.execute({
+        eventId: event.id!.toString(),
+        userId: mockObjectId(),
+        seats: 1,
+      })
+    ).rejects.toMatchObject({
+      code: ERROR_CODES.EVENT_BOOKING_ALREADY_EXISTS,
+    });
+    expect(eventBookingRepository.save).not.toHaveBeenCalled();
+  });
 });

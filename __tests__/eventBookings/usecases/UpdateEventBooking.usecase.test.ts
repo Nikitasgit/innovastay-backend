@@ -11,6 +11,7 @@ import {
   PlaceId,
   UserId,
 } from "@src/domain/value-objects/ObjectId.vo";
+import { ERROR_CODES } from "@src/shared/errors";
 
 const mockObjectId = (): string => new Types.ObjectId().toString();
 
@@ -18,6 +19,7 @@ const createBookableEvent = (params: {
   ownerId: string;
   capacity?: number | null;
   maxSeatsPerBooking?: number;
+  lifecycleStatus?: "upcoming" | "ongoing" | "completed" | "unvalid";
 }): Event => {
   const futureStart = new Date();
   futureStart.setDate(futureStart.getDate() + 10);
@@ -33,7 +35,7 @@ const createBookableEvent = (params: {
     schedule: [{ startDate: futureStart, endDate: futureEnd }],
     dateRange: { firstDate: futureStart, latestDate: futureEnd },
     status: "available",
-    lifecycleStatus: "upcoming",
+    lifecycleStatus: params.lifecycleStatus ?? "upcoming",
     placeId: PlaceId.from(mockObjectId()),
     location: null,
     online: false,
@@ -102,5 +104,70 @@ describe("UpdateEventBookingUseCase", () => {
     expect(eventBookingRepository.update).toHaveBeenCalledWith(
       expect.objectContaining({ seats: 2, status: "confirmed" })
     );
+  });
+
+  it("updates seats while the event is ongoing", async () => {
+    const ownerId = mockObjectId();
+    const bookerId = mockObjectId();
+    const event = createBookableEvent({
+      ownerId,
+      lifecycleStatus: "ongoing",
+    });
+    const booking = EventBooking.reconstitute({
+      id: EventBookingId.from(mockObjectId()),
+      eventId: event.id!,
+      userId: UserId.from(bookerId),
+      seats: 1,
+      status: "confirmed",
+      cancelledAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    eventBookingRepository.findById.mockResolvedValue(booking);
+    eventRepository.findById.mockResolvedValue(event);
+    eventBookingRepository.sumConfirmedSeats.mockResolvedValue(1);
+    eventBookingRepository.update.mockResolvedValue(undefined);
+
+    await useCase.execute({
+      bookingId: booking.id!.toString(),
+      requesterId: ownerId,
+      seats: 2,
+    });
+
+    expect(eventBookingRepository.update).toHaveBeenCalled();
+  });
+
+  it("rejects update when the event is completed", async () => {
+    const ownerId = mockObjectId();
+    const bookerId = mockObjectId();
+    const event = createBookableEvent({
+      ownerId,
+      lifecycleStatus: "completed",
+    });
+    const booking = EventBooking.reconstitute({
+      id: EventBookingId.from(mockObjectId()),
+      eventId: event.id!,
+      userId: UserId.from(bookerId),
+      seats: 1,
+      status: "confirmed",
+      cancelledAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    eventBookingRepository.findById.mockResolvedValue(booking);
+    eventRepository.findById.mockResolvedValue(event);
+
+    await expect(
+      useCase.execute({
+        bookingId: booking.id!.toString(),
+        requesterId: ownerId,
+        seats: 2,
+      })
+    ).rejects.toMatchObject({
+      code: ERROR_CODES.EVENT_BOOKING_UPDATE_CLOSED,
+    });
+    expect(eventBookingRepository.update).not.toHaveBeenCalled();
   });
 });

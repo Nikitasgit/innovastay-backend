@@ -275,6 +275,12 @@ export class Event {
     return this.ownerId === userId;
   }
 
+  areBookingsOpen(): boolean {
+    return (
+      this.lifecycleStatus === "upcoming" || this.lifecycleStatus === "ongoing"
+    );
+  }
+
   private static assertName(name: string): string {
     const trimmed = name.trim();
     if (trimmed.length < 4 || trimmed.length > 40) {

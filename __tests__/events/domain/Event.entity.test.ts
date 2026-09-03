@@ -105,6 +105,45 @@ describe("Event entity", () => {
     expect(event.belongsTo(otherUserId)).toBe(false);
   });
 
+  it("keeps bookings open while upcoming or ongoing", () => {
+    const base = {
+      id: EventId.from(new Types.ObjectId().toString()),
+      name: "Yoga session",
+      description: "A calm yoga class",
+      ownerId,
+      categoryId,
+      schedule: baseSchedule,
+      dateRange: { firstDate: futureStart, latestDate: futureEnd },
+      status: "available" as const,
+      placeId,
+      location: null,
+      online: false,
+      rating: 0,
+      isBookable: true,
+      capacity: 10,
+      maxSeatsPerBooking: 2,
+      deleted: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    expect(
+      Event.reconstitute({ ...base, lifecycleStatus: "upcoming" }).areBookingsOpen()
+    ).toBe(true);
+    expect(
+      Event.reconstitute({ ...base, lifecycleStatus: "ongoing" }).areBookingsOpen()
+    ).toBe(true);
+    expect(
+      Event.reconstitute({
+        ...base,
+        lifecycleStatus: "completed",
+      }).areBookingsOpen()
+    ).toBe(false);
+    expect(
+      Event.reconstitute({ ...base, lifecycleStatus: "unvalid" }).areBookingsOpen()
+    ).toBe(false);
+  });
+
   it("rejects maxSeatsPerBooking above capacity when bookable", () => {
     expect(() =>
       Event.create({

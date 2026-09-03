@@ -83,8 +83,11 @@ class AuthController extends BaseHttpController {
   getCurrentUser(): RequestHandler {
     return this.handler({
       execute: async (req) => {
+        if (!req.decoded?.id) {
+          return { user: null };
+        }
         const user = await this.getUserByIdUseCase.execute({
-          userId: requireAuth(req).id,
+          userId: req.decoded.id,
           view: "current",
         });
         return { user };
