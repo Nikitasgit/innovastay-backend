@@ -25,5 +25,17 @@ describe("eventBooking validations", () => {
 
       expect(result.success).toBe(false);
     });
+
+    it("rejects a negative seat count", () => {
+      const result = createEventBookingSchema.safeParse({ seats: -1 });
+
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a non-numeric payload that could be used as an injection", () => {
+      const result = createEventBookingSchema.safeParse({ seats: "$gt" });
+
+      expect(result.success).toBe(false);
+    });
   });
 });

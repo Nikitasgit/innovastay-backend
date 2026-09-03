@@ -10,6 +10,7 @@ import { registerEventInvitationsModule } from "@src/di/modules/eventInvitations
 import { registerEventsModule } from "@src/di/modules/events";
 import { registerFavoritesModule } from "@src/di/modules/favorites";
 import { registerFollowsModule } from "@src/di/modules/follows";
+import { registerGeocodingModule } from "@src/di/modules/geocoding";
 import { registerImagesModule } from "@src/di/modules/images";
 import { registerMessagesModule } from "@src/di/modules/messages";
 import { registerNotificationsModule } from "@src/di/modules/notifications";
@@ -40,6 +41,7 @@ export const createAppContainer = (): AwilixContainer<Cradle> => {
   registerEventsModule(container);
   registerFavoritesModule(container);
   registerFollowsModule(container);
+  registerGeocodingModule(container);
   registerImagesModule(container);
   registerMessagesModule(container);
   registerNotificationsModule(container);

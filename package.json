@@ -24,6 +24,8 @@
     "create:admin": "ts-node -r tsconfig-paths/register scripts/create-admin.ts",
     "seed:categories": "ts-node -r tsconfig-paths/register scripts/seed-categories.ts",
     "seed:e2e-user": "ts-node -r tsconfig-paths/register scripts/seed-e2e-user.ts",
+    "seed:ecosystem": "ts-node -r tsconfig-paths/register scripts/seed-ecosystem/index.ts",
+    "seed:ecosystem:reset": "ts-node -r tsconfig-paths/register scripts/seed-ecosystem/index.ts --reset",
     "knip": "knip",
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings 0",
@@ -56,6 +58,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@faker-js/faker": "^8.4.1",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.18",

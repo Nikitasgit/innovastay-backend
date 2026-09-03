@@ -12,7 +12,7 @@ const createAuthRoutes = ({
   router.post("/signin", rateLimiterMiddleware.auth(), authController.signIn());
   router.post("/google", rateLimiterMiddleware.auth(), authController.googleAuth());
   router.post("/signout", authController.signOut());
-  router.get("/me", authMiddleware.verify(), authController.getCurrentUser());
+  router.get("/me", authMiddleware.verifyOptional(), authController.getCurrentUser());
   router.patch("/accept-cgu", authMiddleware.verify(), authController.acceptCgu());
   router.get(
     "/verify-email",

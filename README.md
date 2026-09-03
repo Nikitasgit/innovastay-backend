@@ -24,9 +24,8 @@ Plateforme de **découverte d'événements locaux** : carte interactive, lieux, 
 6. [ Dépendances principales](#-dépendances-principales)
 7. [ Notes importantes](#-notes-importantes)
 8. [Déploiement](#-déploiement)
-   - [Déploiement initial sur AWS EC2](#déploiement-initial-sur-aws-ec2)
-   - [Mise à jour du backend](#mise-à-jour-du-backend-après-un-push)
-   - [Commandes PM2 utiles](#commandes-pm2-utiles)
+   - [Service web Render](#service-web-render)
+   - [Mise à jour](#mise-à-jour)
    - [Checklist avant déploiement](#checklist-avant-déploiement)
 
 ---
@@ -69,7 +68,30 @@ npm run test:all
 
 # Démarrage en production
 npm start
+
+# Seed écosystème fictif (local Docker / Mongo localhost)
+npm run seed:ecosystem -- --target local --reset
+
+# Seed Atlas staging (confirmation obligatoire)
+npm run seed:ecosystem -- --target staging --confirm staging --reset
+
+# Itération rapide sans upload S3
+npm run seed:ecosystem -- --target local --skip-images --users 50 --events 200
 ```
+
+### Seed écosystème (local / staging)
+
+Script `scripts/seed-ecosystem/` : ~1500 utilisateurs, lieux, ~15000 événements, invitations, réservations, follows, favoris et partenariats, répartis entre grandes villes et petites agglomérations (Beaune, Uzès, Arles, Colmar, Annecy, …). **Jamais la production.**
+
+- Prérequis : `npm run seed:categories`
+- Cible `local` : utilise `E2E_MONGODB_URI` si défini, sinon `MONGODB_URI` (localhost / `mongo`)
+- Cible `staging` : `MONGODB_URI` Atlas dont l’hôte contient `staging`, plus `--confirm staging`
+- `--reset` : supprime uniquement les comptes `@leafymap.seed` et les objets S3 `images/seed/`
+- Mot de passe commun : `SEED_USER_PASSWORD` ou défaut `SeedUser!2026`
+- Comptes démo : `boulangerie.martin@leafymap.seed`, `le.bar.perche@leafymap.seed`, `atelier.luma@leafymap.seed`
+- `--skip-images` : pas d’upload AWS (avatars par défaut dans l’UI)
+- Pool d’images : ~60 photos thématiques réutilisées, préfixe S3 `images/seed/` (le bucket est partagé avec la prod)
+- Ne pas lancer depuis docker-compose / Dockerfile (trop lourd + effets S3)
 
 La CI exécute, dans l'ordre : `lint:ci`, `knip`, `build`, tests unitaires, puis
 tests d'intégration et couverture. Elle s'exécute pour `develop` et `main`.
@@ -398,6 +420,7 @@ NODE_ENV=development|production
 MONGODB_URI=mongodb://...
 DATABASE_URL=postgresql://leafymap:leafymap@localhost:5432/leafymap?schema=public
 REDIS_URL=redis://localhost:6379
+MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here
 JWT_SECRET=your_secret_key
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
@@ -432,7 +455,10 @@ Voir aussi `env.example`.
 
 - **Client** : `redis` (node-redis), via `src/infrastructure/persistence/redis.ts`
 - **Port** : `ICache` (`src/domain/interfaces/ICache.ts`)
-- **Usage actuel** : `GET /api/categories` (clé `categories:all`, TTL 24h), invalidé par `npm run seed:categories`
+- **Usage actuel** :
+  - `GET /api/categories` (clé `categories:all`, TTL 24h), invalidé par `npm run seed:categories`
+  - `GET /api/places/in-view` et `GET /api/events/in-view` (bbox quantifiée, TTL 30s / 20s ; pas de cache sur `ids`)
+  - `GET /api/geocode/suggest` et `GET /api/geocode/reverse` (TTL 1h)
 - **Fail-open** : si `REDIS_URL` est absent ou Redis injoignable, l'API retombe sur Mongo
 - **Docker local** : service `redis` (port `6379`) dans le compose à la racine du repo
 
@@ -440,7 +466,20 @@ Voir aussi `env.example`.
 REDIS_URL=redis://localhost:6379
 ```
 
-En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant que la variable n'est pas définie, le comportement reste celui d'avant (pas de cache).
+En production, pointer `REDIS_URL` vers l'URL **TCP** du provider (pas l'API REST Upstash). Upstash exige TLS : `rediss://default:PASSWORD@HOST:6379` (l'équivalent de `redis-cli --tls`). Tant que la variable n'est pas définie, le comportement reste celui d'avant (pas de cache).
+
+### Mapbox (géocodage)
+
+Le frontend utilise encore `NEXT_PUBLIC_MAPBOX_TOKEN` pour les **tuiles**. Le géocodage (autocomplete, reverse) passe par l'API :
+
+- `GET /api/geocode/suggest?q=`
+- `GET /api/geocode/reverse?lng=&lat=`
+
+```env
+MAPBOX_ACCESS_TOKEN=pk.your_mapbox_token
+```
+
+Si le token est absent ou Mapbox injoignable, l'API renvoie une liste vide / `null` (fail-open). À définir aussi sur Render, côté web service.
 
 ### AWS S3
 
@@ -453,7 +492,7 @@ En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant q
 - **Express** : Framework web
 - **Mongoose** : ODM MongoDB
 - **Prisma** : ORM PostgreSQL (annonces plateforme)
-- **Redis** : cache (catégories ; fail-open)
+- **Redis** : cache (catégories, carte in-view, géocodage ; fail-open)
 - **Zod** : Validation de schémas
 - **JWT** : Authentification
 - **Bcrypt** : Hashage des mots de passe
@@ -472,219 +511,41 @@ En production (EC2), pointer `REDIS_URL` vers Redis local ou ElastiCache. Tant q
 
 ## Déploiement
 
-### Déploiement initial sur AWS EC2
+L'API est hébergée sur **Render** (web service Node.js). Le frontend reste sur **Vercel**. Les images restent sur **AWS S3** ; MongoDB Atlas et PostgreSQL sont des services managés distincts. Il n'y a plus d'instance EC2, ni Nginx, ni PM2.
 
-Le backend est déployé sur une instance AWS EC2 Ubuntu. Voici les étapes qui ont été suivies :
+### Service web Render
 
-#### 1. Configuration de l'instance EC2
-
-- Création d'une instance EC2 sur AWS
-- Génération d'une paire de clés SSH (`.pem`)
-- Configuration des groupes de sécurité (ports 80, 443, 22)
-
-#### 2. Connexion et configuration du serveur
+1. Créer un **Web Service** sur Render, connecté au dépôt GitHub `leafymap_backend`.
+2. Runtime **Node**.
+3. Commandes :
 
 ```bash
-# Connexion SSH à l'instance
-ssh -i "votre-cle.pem" ubuntu@your-instance.compute.amazonaws.com
+# Build
+npm run render:build
 
-# Mise à jour du système Ubuntu
-sudo apt update && sudo apt upgrade -y
+# Start
+npm start
 ```
 
-#### 3. Installation des dépendances
+`render:build` installe les dépendances (y compris `devDependencies` nécessaires à TypeScript / Prisma), compile, puis exécute `prisma migrate deploy`.
 
-```bash
-# Installation de Node.js via NVM
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-source ~/.bashrc
-nvm install 22
-nvm use 22
+4. Renseigner les variables d'environnement dans le dashboard Render (mêmes clés que le `.env` local : `MONGODB_URI`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `FRONTEND_URL`, clés S3, SMTP, `MAPBOX_ACCESS_TOKEN`, etc.). Ne jamais committer les secrets.
+5. HTTPS et le reverse proxy sont fournis par Render. Un domaine personnalisé peut être branché dans le dashboard (DNS chez le registrar).
+6. Activer le **auto-deploy** sur `main` : un push qui passe (idéalement après CI GitHub Actions) déclenche un nouveau build Render.
 
-# Installation de Git
-sudo apt install git -y
+Logs, redémarrages et historique des deploys : dashboard Render du service.
 
-# Installation de PM2 (Process Manager)
-npm install -g pm2
-```
+### Mise à jour
 
-#### 4. Clonage et configuration du projet
+Avec l'auto-deploy : `git push` sur `main` suffit. Sinon : **Manual Deploy** dans Render.
 
-```bash
-# Cloner le repository
-git clone https://github.com/your-username/your-backend.git
-cd your-backend
-
-# Installation des dépendances
-npm install
-
-# Création du fichier .env avec les variables d'environnement
-nano .env
-
-# Build du projet TypeScript
-npm run build
-
-# Démarrage avec PM2
-pm2 start dist/main/server.js --name backend-app
-pm2 save
-pm2 startup
-```
-
-#### 5. Configuration de Nginx (Reverse Proxy)
-
-```bash
-# Installation de Nginx
-sudo apt install nginx -y
-
-# Configuration du reverse proxy
-sudo nano /etc/nginx/sites-available/backend
-
-# Redirection des requêtes vers le port 3000
-# Redirection HTTP → HTTPS automatique
-```
-
-Configuration Nginx :
-
-```nginx
-server {
-    listen 80;
-    server_name api.yourdomain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-#### 6. Configuration DNS (Route 53)
-
-- Ajout d'un enregistrement A : `api.yourdomain.com` → IP de l'instance EC2
-- TTL : 600 secondes
-
-#### 7. Certificat SSL avec Certbot
-
-```bash
-# Installation de Certbot
-sudo apt install certbot python3-certbot-nginx -y
-
-# Génération du certificat SSL
-sudo certbot --nginx -d api.yourdomain.com
-
-# Renouvellement automatique configuré
-```
-
-Le backend est maintenant accessible sur **https://api.yourdomain.com**
-
----
-
-### Mise à jour du backend (après un push)
-
-Lorsque vous poussez des modifications sur le repository GitHub, suivez ces étapes pour mettre à jour le serveur :
-
-#### Étape 1 : Connexion SSH au serveur
-
-```bash
-# Remplacer par votre clé et votre instance
-ssh -i "votre-cle-ssh.pem" ubuntu@votre-instance.compute.amazonaws.com
-```
-
-> ⚠️ **Important** : Assurez-vous que votre fichier de clé SSH a les bonnes permissions :
->
-> ```bash
-> chmod 400 votre-cle-ssh.pem
-> ```
-
-#### Étape 2 : Navigation vers le projet
-
-```bash
-cd your-backend
-```
-
-#### Étape 3 : Récupération des dernières modifications
-
-```bash
-git pull origin main
-```
-
-#### Étape 4 : Installation des nouvelles dépendances (si nécessaire)
-
-```bash
-npm install
-```
-
-#### Étape 5 : Build du projet TypeScript
-
-```bash
-npm run build
-```
-
-#### Étape 6 : Redémarrage de l'application avec PM2
-
-```bash
-pm2 restart backend-app
-```
-
-#### Étape 7 : Vérification du statut
-
-```bash
-# Vérifier que l'application tourne correctement
-pm2 status
-
-# Voir les logs en temps réel (optionnel)
-pm2 logs backend-app
-
-# Voir les logs d'erreur uniquement
-pm2 logs backend-app --err
-```
-
-### Commandes PM2 utiles
-
-````bash
-# Voir le statut de toutes les applications
-pm2 status
-
-# Voir les logs
-pm2 logs backend-app
-
-# Arrêter l'application
-pm2 stop backend-app
-
-# Démarrer l'application
-pm2 start backend-app
-
-# Redémarrer l'application
-pm2 restart backend-app
-
-# Supprimer l'application de PM2
-pm2 delete backend-app
-
-# Vider les logs
-pm2 flush
-
-
-### Résumé rapide : Mise à jour en 5 commandes
-
-```bash
-ssh -i "votre-cle.pem" ubuntu@your-instance.compute.amazonaws.com
-cd your-backend
-git pull
-npm run build
-pm2 restart backend-app
-````
+Vérifier ensuite les logs du deploy (build, migrate, start) puis un appel à l'API en production.
 
 ### Checklist avant déploiement
 
-- [ ] Variables d'environnement à jour sur le serveur
-- [ ] Build local réussi
-- [ ] Commit et push sur GitHub
-- [ ] Connexion SSH au serveur OK
-- [ ] Git pull réussi
-- [ ] Build sur le serveur réussi
-- [ ] PM2 restart effectué
-- [ ] Vérification des logs PM2
-- [ ] Test de l'API en production
+- [ ] Variables d'environnement à jour dans Render (rien de secret dans Git)
+- [ ] Build local réussi (`npm run build`)
+- [ ] CI GitHub Actions verte sur la PR
+- [ ] Push sur `main` (ou deploy manuel Render)
+- [ ] Logs Render : migrate + start OK
+- [ ] Test de l'API en production (`FRONTEND_URL` / CORS cohérents avec `https://leafymap.com`)

@@ -45,10 +45,10 @@ class UpdateEventBookingUseCase {
       );
     }
 
-    if (event.lifecycleStatus !== "upcoming") {
+    if (!event.areBookingsOpen()) {
       throw new ForbiddenError(
         ERROR_CODES.EVENT_BOOKING_UPDATE_CLOSED,
-        "Cet évènement a déjà commencé ou est terminé, la réservation ne peut plus être modifiée"
+        "Cet évènement est terminé, la réservation ne peut plus être modifiée"
       );
     }
 

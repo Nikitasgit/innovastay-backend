@@ -118,4 +118,43 @@ describe("AuthMiddleware", () => {
     );
     expect(next.mock.calls[0][0]).toBeInstanceOf(UnauthorizedError);
   });
+
+  it("rejects when no token is provided", async () => {
+    await runVerify({ cookies: {}, headers: {} });
+
+    expect(jwtTokenIssuer.verify).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: ERROR_CODES.UNAUTHORIZED,
+      })
+    );
+    expect(next.mock.calls[0][0]).toBeInstanceOf(UnauthorizedError);
+  });
+
+  it("rejects an invalid token", async () => {
+    jwtTokenIssuer.verify.mockImplementation(() => {
+      throw new Error("Invalid token");
+    });
+
+    await runVerify();
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: ERROR_CODES.UNAUTHORIZED,
+      })
+    );
+    expect(next.mock.calls[0][0]).toBeInstanceOf(UnauthorizedError);
+  });
+
+  it("verifyOptional continues without a token", async () => {
+    const handler = middleware.verifyOptional();
+    await handler(
+      { cookies: {}, headers: {} } as CustomRequest,
+      {} as never,
+      next
+    );
+
+    expect(jwtTokenIssuer.verify).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith();
+  });
 });

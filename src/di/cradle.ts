@@ -38,6 +38,7 @@ import type EventInvitationsController from "@src/api/controllers/EventInvitatio
 import type EventsController from "@src/api/controllers/EventsController";
 import type FavoritesController from "@src/api/controllers/FavoritesController";
 import type FollowsController from "@src/api/controllers/FollowsController";
+import type GeocodingController from "@src/api/controllers/GeocodingController";
 import type ImagesController from "@src/api/controllers/ImagesController";
 import type MessagesController from "@src/api/controllers/MessagesController";
 import type NotificationsController from "@src/api/controllers/NotificationsController";
@@ -76,6 +77,8 @@ import type DeleteFollowUseCase from "@src/application/usecases/follows/DeleteFo
 import type GetFollowersUseCase from "@src/application/usecases/follows/GetFollowers.usecase";
 import type GetFollowingUseCase from "@src/application/usecases/follows/GetFollowing.usecase";
 import type GetOneFollowUseCase from "@src/application/usecases/follows/GetOneFollow.usecase";
+import type GetLocationSuggestionsUseCase from "@src/application/usecases/geocode/GetLocationSuggestions.usecase";
+import type ReverseGeocodeUseCase from "@src/application/usecases/geocode/ReverseGeocode.usecase";
 import type DeleteImagesUseCase from "@src/application/usecases/images/DeleteImages.usecase";
 import type GetImagesUseCase from "@src/application/usecases/images/GetImages.usecase";
 import type UploadImagesUseCase from "@src/application/usecases/images/UploadImages.usecase";
@@ -132,6 +135,7 @@ import type { IEventRepository } from "@src/domain/interfaces/IEventRepository";
 import type { IFavoriteRepository } from "@src/domain/interfaces/IFavoriteRepository";
 import type { IFollowCounter } from "@src/domain/interfaces/IFollowCounter";
 import type { IFollowNotifier } from "@src/domain/interfaces/IFollowNotifier";
+import type { IGeocoder } from "@src/domain/interfaces/IGeocoder";
 import type { IFollowRepository } from "@src/domain/interfaces/IFollowRepository";
 import type { IGoogleIdentityVerifier } from "@src/domain/interfaces/IGoogleIdentityVerifier";
 import type { IImageReferenceOwnershipChecker } from "@src/domain/interfaces/IImageReferenceOwnershipChecker";
@@ -184,6 +188,7 @@ export interface Cradle {
 
   // Shared adapters / ports
   cache: ICache;
+  geocoder: IGeocoder;
   userPlaceLinker: IUserPlaceLinker;
   realtimePublisher: IMessageRealtimePublisher;
   unreadConversationCounter: IUnreadConversationCounter;
@@ -292,6 +297,11 @@ export interface Cradle {
   getFollowingUseCase: GetFollowingUseCase;
   getOneFollowUseCase: GetOneFollowUseCase;
   followsController: FollowsController;
+
+  // Geocoding
+  getLocationSuggestionsUseCase: GetLocationSuggestionsUseCase;
+  reverseGeocodeUseCase: ReverseGeocodeUseCase;
+  geocodingController: GeocodingController;
 
   // Images
   uploadImagesUseCase: UploadImagesUseCase;

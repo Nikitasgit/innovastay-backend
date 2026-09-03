@@ -20,8 +20,8 @@ export async function connectRedis(): Promise<void> {
 
   try {
     const nextClient = createClient({ url });
-    nextClient.on("error", (err) => {
-      logger.error(`Redis client error: ${(err as Error).message}`);
+    nextClient.on("error", (err: Error) => {
+      logger.error(`Redis client error: ${err.message}`);
     });
     await nextClient.connect();
     client = nextClient;

@@ -162,13 +162,32 @@ describe("CancelEventBookingUseCase", () => {
     ).rejects.toMatchObject({ code: ERROR_CODES.FORBIDDEN });
   });
 
-  it("closes cancellation after the event starts", async () => {
+  it("lets the booking owner cancel while the event is ongoing", async () => {
     const userId = UserId.from(objectId());
     const eventId = EventId.from(objectId());
     const booking = createBooking(eventId, userId);
     bookingRepository.findById.mockResolvedValue(booking);
     eventRepository.findById.mockResolvedValue(
       createEvent(eventId, UserId.from(objectId()), "ongoing")
+    );
+
+    await useCase.execute({
+      bookingId: booking.id!,
+      requesterId: userId,
+    });
+
+    expect(bookingRepository.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "cancelled" })
+    );
+  });
+
+  it("closes cancellation after the event is completed", async () => {
+    const userId = UserId.from(objectId());
+    const eventId = EventId.from(objectId());
+    const booking = createBooking(eventId, userId);
+    bookingRepository.findById.mockResolvedValue(booking);
+    eventRepository.findById.mockResolvedValue(
+      createEvent(eventId, UserId.from(objectId()), "completed")
     );
 
     await expect(
